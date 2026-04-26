@@ -18,9 +18,9 @@
           <h1>Turn Azure exports into drill-down Mermaid topology views.</h1>
           <p class="masthead-lede">Import one or many Azure JSON payloads, model them locally in the browser, and switch between estate, platform, network, and full-detail topology views.</p>
           <div class="hero-actions">
-            <button id="render-button" class="primary">Build topology</button>
-            <button id="fit-button" class="secondary" type="button">Fit diagram</button>
-            <button id="clear-button" class="ghost" type="button">Clear session</button>
+            <button id="render-button" class="primary" data-action="render">Build topology</button>
+            <button id="fit-button" class="secondary" type="button" data-action="fit">Fit diagram</button>
+            <button id="clear-button" class="ghost" type="button" data-action="clear">Clear session</button>
           </div>
           <div class="hero-notes" aria-label="Local processing details">
             <span>Browser-side parsing</span>
@@ -232,6 +232,18 @@
       </section>
     </section>
   </main>
+
+  <div class="floating-dock" aria-label="Primary workspace actions">
+    <div class="floating-dock-inner">
+      <span class="floating-dock-label">Quick actions</span>
+      <div class="floating-dock-actions">
+        <button class="primary" type="button" data-action="render">Build topology</button>
+        <button class="secondary" type="button" data-action="fit">Fit diagram</button>
+        <button class="ghost" type="button" data-action="export-svg">Export SVG</button>
+        <button class="ghost" type="button" data-action="clear">Clear session</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./src/app.js"></script>
 </body>

@@ -6,6 +6,7 @@ import { escapeHtml } from "./core/arm.js";
 import { renderMermaid } from "./render/mermaid.js";
 
 const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const state = {
   inputs: [],
@@ -354,17 +355,18 @@ function clearSession() {
 }
 
 function attachEvents() {
-  $("#render-button").addEventListener("click", rebuild);
+  $$('[data-action="render"]').forEach((button) => button.addEventListener("click", rebuild));
   $("#view-select").addEventListener("change", rebuild);
   $("#layout-select").addEventListener("change", rebuild);
   $("#group-select").addEventListener("change", rebuild);
   $("#inferred-toggle").addEventListener("change", rebuild);
   $("#containment-toggle").addEventListener("change", rebuild);
-  $("#fit-button").addEventListener("click", fitDiagram);
+  $$('[data-action="fit"]').forEach((button) => button.addEventListener("click", fitDiagram));
   $("#copy-button").addEventListener("click", copyMermaid);
+  $$('[data-action="export-svg"]').forEach((button) => button.addEventListener("click", downloadSvg));
   $("#download-svg-button").addEventListener("click", downloadSvg);
   $("#download-graph-button").addEventListener("click", exportGraph);
-  $("#clear-button").addEventListener("click", clearSession);
+  $$('[data-action="clear"]').forEach((button) => button.addEventListener("click", clearSession));
   $("#search-input").addEventListener("input", renderInventory);
   $("#file-input").addEventListener("change", async () => {
     const files = Array.from($("#file-input").files || []);

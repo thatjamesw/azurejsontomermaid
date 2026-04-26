@@ -1,64 +1,72 @@
 # Azure JSON to Mermaid
 
-Azure JSON to Mermaid is a static browser application that turns Azure resource exports into Mermaid topology diagrams.
+Azure JSON to Mermaid is a browser-based topology designer for Azure environments. It takes Azure resource exports, models them as a connected graph, and turns them into Mermaid diagrams that can be reviewed, refined, and shared.
 
-The app is designed for GitHub Pages deployment and runs entirely in the browser. You can load one or many Azure JSON payloads, normalize them into a graph, and generate drill-down topology views without a backend service.
+The application is built as a static site and is well suited to GitHub Pages. There is no backend dependency, and all parsing and graph generation happen in the browser.
 
-## What it does
+## Why use it
 
-- Imports Azure JSON files and pasted JSON payloads
-- Normalizes mixed Azure resource exports into a single topology graph
-- Generates Mermaid diagrams for multiple levels of detail
-- Supports drill-down views such as high level, platform, network, and full detail
-- Surfaces provider and resource-type coverage for imported data
-- Exports Mermaid source, SVG output, and normalized graph JSON
+Azure exports are rich, but they are not easy to scan as architecture. This tool helps turn raw resource JSON into something people can reason about:
+
+- high-level estate views for quick orientation
+- drill-down topology views for platform and network review
+- Mermaid output for documentation, design reviews, and knowledge sharing
+- graph exports for downstream tooling and automation
+
+## Core capabilities
+
+- Import one or many Azure JSON files
+- Paste raw Azure JSON directly into the workspace
+- Normalize mixed payloads into a single topology model
+- Generate multiple view levels, including high level, platform, network, and full detail
+- Surface provider and resource-type coverage from the imported dataset
+- Export Mermaid source, SVG diagrams, and normalized graph JSON
 
 ## How it works
 
-The application uses a browser-side pipeline:
+The application follows a browser-side pipeline:
 
 1. Load Azure JSON exports
-2. Normalize resources into a common model
-3. Build resource relationships and hierarchy
+2. Normalize the resource payloads into a common model
+3. Discover hierarchy and service relationships
 4. Project the graph into a chosen topology view
 5. Render the result as a Mermaid diagram
 
-## Key design choices
+## Product principles
 
-- Static front end suitable for GitHub Pages
-- No server-side processing
-- No Flask or Python runtime required
-- Local-first workflow for reviewing Azure topology safely in the browser
-- Resolver-based architecture so Azure service support can grow over time
+- Static site, easy to host and publish
+- Local-first processing in the browser
+- Designed for architecture review and documentation workflows
+- Resolver-based Azure modeling so service coverage can expand over time
+
+## Azure service modeling
+
+The tool combines two approaches:
+
+- generic ARM ID discovery for broad compatibility across Azure resource types
+- service-aware resolvers for richer topology relationships across networking, compute, app, AI, monitoring, analytics, integration, security, and data services
+
+This allows the application to stay useful even with partial exports, while producing deeper and more meaningful topology views when known Azure service patterns are present.
 
 ## Project structure
 
 - `index.html` - application shell
-- `static/styles.css` - visual design and layout
-- `src/app.js` - UI orchestration and interaction logic
-- `src/core/` - normalization, graph modeling, ARM helpers, and Azure service catalog
-- `src/core/resolvers/` - Azure service-aware relationship resolvers
+- `static/styles.css` - layout, visual language, and interaction styling
+- `src/app.js` - UI orchestration and interaction flow
+- `src/core/` - normalization, graph modeling, ARM helpers, and service catalog logic
+- `src/core/resolvers/` - Azure service-specific relationship resolvers
 - `src/render/mermaid.js` - Mermaid output generation
-
-## Azure coverage
-
-The app includes both:
-
-- generic ARM ID discovery for broad compatibility across Azure services
-- service-aware resolvers for richer relationships across networking, compute, app, AI, monitoring, analytics, integration, security, and data services
-
-This means the tool can produce useful topology diagrams even for partial exports or less common resource types, while providing deeper relationship modeling where Azure-specific patterns are known.
 
 ## Deployment
 
-This repository is intended to be published as a static site, including GitHub Pages.
+This repository is intended to be published as a static web application, including through GitHub Pages.
 
-Because the app is front-end only, deployment is lightweight:
+Deployment is simple:
 
-- host the repository as a static site
-- open the site in a browser
-- load Azure JSON exports directly into the workspace
+1. Publish the repository as a static site
+2. Open the application in a browser
+3. Load Azure JSON exports into the workspace
 
 ## Local sample data
 
-Azure sample exports can be kept in a local `json/` folder for testing, but they are intentionally ignored from source control.
+Sample Azure exports can be kept in a local `json/` folder for testing and development. That folder is intentionally ignored from source control.
