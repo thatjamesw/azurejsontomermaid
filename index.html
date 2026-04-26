@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Azure Topology Designer</title>
+  <link rel="stylesheet" href="./static/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead" aria-label="Azure topology workspace">
+      <div class="masthead-topline">
+        <p class="brand-mark">Azure Topology Designer</p>
+      </div>
+      <div class="masthead-main">
+        <div class="masthead-copy">
+          <h1>Turn Azure exports into drill-down Mermaid topology views.</h1>
+          <p class="masthead-lede">Import one or many Azure JSON payloads, model them locally in the browser, and switch between estate, platform, network, and full-detail topology views.</p>
+          <div class="hero-actions">
+            <button id="render-button" class="primary">Build topology</button>
+            <button id="fit-button" class="secondary" type="button">Fit diagram</button>
+            <button id="clear-button" class="ghost" type="button">Clear session</button>
+          </div>
+          <div class="hero-notes" aria-label="Local processing details">
+            <span>Browser-side parsing</span>
+            <span>Mermaid with ELK layout</span>
+            <span>View presets for drill-down</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="workflow-strip" aria-label="Core workflow">
+      <article class="workflow-step">
+        <span class="workflow-kicker">Step 1</span>
+        <strong>Load exports</strong>
+        <p>Import Azure files, or paste raw JSON directly into the workspace.</p>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-kicker">Step 2</span>
+        <strong>Shape the view</strong>
+        <p>Choose the drill-down level, layout direction, and whether inferred edges should be shown.</p>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-kicker">Step 3</span>
+        <strong>Review topology</strong>
+        <p>Inspect normalized resources, relationships, and graph health before exporting.</p>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-kicker">Step 4</span>
+        <strong>Export output</strong>
+        <p>Copy Mermaid, export SVG, or pass the normalized graph to later tooling.</p>
+      </article>
+    </section>
+
+    <section class="flow">
+      <section class="flow-step">
+        <div class="step-marker">
+          <span class="section-label">Step 1</span>
+          <h2>Load Azure JSON Data</h2>
+        </div>
+        <div class="control-grid input-grid">
+          <div class="stack">
+            <label class="label" for="file-input">Azure export files</label>
+            <input id="file-input" type="file" multiple accept=".json,application/json" />
+            <div class="upload-meta">Multiple files supported. Arrays, single resources, and mixed payloads are normalized into one graph.</div>
+          </div>
+          <div class="stack span-2">
+            <label class="label" for="json-input">Raw JSON</label>
+            <textarea id="json-input" placeholder="Paste Azure JSON here if you want to combine it with uploaded files."></textarea>
+          </div>
+        </div>
+        <div class="notice-strip">
+          <div id="file-summary" class="inline-note">No files selected.</div>
+        </div>
+      </section>
+
+      <section class="flow-step studio-controls">
+        <div class="step-marker">
+          <span class="section-label">Step 2</span>
+          <h2>Set the drill-down.</h2>
+          <p class="section-intro">Tune view depth, layout direction, and inspection context before you render.</p>
+        </div>
+        <div class="control-grid">
+          <div class="stack">
+            <label class="label" for="view-select">Topology view</label>
+            <select id="view-select">
+              <option value="high">High level</option>
+              <option value="platform">Platform</option>
+              <option value="network">Network</option>
+              <option value="full">Full detail</option>
+            </select>
+          </div>
+          <div class="stack">
+            <label class="label" for="layout-select">Layout direction</label>
+            <select id="layout-select">
+              <option value="LR">Left to right</option>
+              <option value="TB">Top to bottom</option>
+            </select>
+          </div>
+          <div class="stack">
+            <label class="label" for="group-select">Grouping</label>
+            <select id="group-select">
+              <option value="resourceGroup">Subscription and resource group</option>
+              <option value="subscription">Subscription only</option>
+              <option value="none">Flat graph</option>
+            </select>
+          </div>
+          <div class="stack">
+            <label class="label" for="search-input">Inspector filter</label>
+            <input id="search-input" type="search" placeholder="Filter by name, type, kind, or resource group" />
+          </div>
+        </div>
+
+        <div class="scope-list toggle-row">
+          <label class="scope-pill compact">
+            <input id="inferred-toggle" type="checkbox" checked />
+            <span>Show inferred ARM-ID links</span>
+            <small>Includes relationships discovered from referenced resource IDs in properties.</small>
+          </label>
+          <label class="scope-pill compact">
+            <input id="containment-toggle" type="checkbox" checked />
+            <span>Show containment edges</span>
+            <small>Includes subscription, resource group, and VNet containment structure.</small>
+          </label>
+        </div>
+      </section>
+
+      <section class="workspace-band flow-step">
+        <div class="workspace-top">
+          <div class="step-marker">
+            <span class="section-label">Step 3</span>
+            <h2>Review the topology.</h2>
+            <p class="section-intro">Use the canvas as the primary surface, then move into inventory, detail, and coverage.</p>
+          </div>
+        </div>
+
+        <div class="stats-shell">
+          <table class="stats-table" aria-label="Topology summary">
+            <tbody>
+              <tr><th>Files</th><td id="metric-files">0</td><th>Resources</th><td id="metric-resources">0</td></tr>
+              <tr><th>Nodes in view</th><td id="metric-nodes">0</td><th>Edges in view</th><td id="metric-edges">0</td></tr>
+              <tr><th>Subscriptions</th><td id="metric-subscriptions">0</td><th>Resource groups</th><td id="metric-groups">0</td></tr>
+              <tr><th>Provider namespaces</th><td id="metric-providers">0</td><th>Distinct resource types</th><td id="metric-types">0</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="workspace-stack">
+          <section class="diagram-stage" aria-label="Rendered Mermaid diagram">
+            <div class="panel-head">
+              <div>
+                <span class="page-label">Diagram</span>
+                <h3>Topology canvas</h3>
+              </div>
+              <div class="canvas-tools button-row" aria-label="Diagram export tools">
+                <button id="copy-button" class="ghost" type="button">Copy Mermaid</button>
+                <button id="download-svg-button" class="ghost" type="button">Export SVG</button>
+                <button id="download-graph-button" class="ghost" type="button">Export graph JSON</button>
+              </div>
+            </div>
+            <div id="diagram-shell" class="diagram-shell">
+              <div id="diagram" class="diagram-empty">Build a topology view to render the diagram.</div>
+            </div>
+          </section>
+
+          <div class="inspection-grid">
+            <aside class="inspector" aria-label="Topology inventory">
+              <div class="panel-head">
+                <div>
+                  <span class="page-label">Inspector</span>
+                  <h3>Inventory</h3>
+                </div>
+              </div>
+              <div id="inventory" class="inventory"></div>
+            </aside>
+
+            <section class="inspector detail-stage" aria-label="Selected resource details">
+              <div class="panel-head">
+                <div>
+                  <span class="page-label">Details</span>
+                  <h3>Selected resource</h3>
+                </div>
+              </div>
+              <div id="detail" class="detail-panel">
+                <p class="detail-empty">Select a resource from the inventory to inspect its metadata and relationships.</p>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="coverage-grid">
+          <section class="coverage-panel">
+            <div class="panel-head">
+              <div>
+                <span class="page-label">Coverage</span>
+                <h3>Provider namespaces</h3>
+              </div>
+            </div>
+            <table class="coverage-table" aria-label="Provider namespace breakdown">
+              <tbody id="provider-breakdown"></tbody>
+            </table>
+          </section>
+          <section class="coverage-panel">
+            <div class="panel-head">
+              <div>
+                <span class="page-label">Coverage</span>
+                <h3>Resource types</h3>
+              </div>
+            </div>
+            <table class="coverage-table" aria-label="Resource type breakdown">
+              <tbody id="type-breakdown"></tbody>
+            </table>
+          </section>
+        </div>
+      </section>
+
+      <section class="flow-step output-band">
+        <div class="step-marker">
+          <span class="section-label">Step 4</span>
+          <h2>Mermaid source.</h2>
+          <p class="section-intro">Keep the generated source close at hand for documentation, review, or downstream automation.</p>
+        </div>
+        <div class="panel-head output-head">
+          <div>
+            <span class="page-label">Output</span>
+            <h3>Mermaid source</h3>
+          </div>
+        </div>
+        <textarea id="mermaid-output" class="output-area" readonly placeholder="Generated Mermaid will appear here after the topology is built."></textarea>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
