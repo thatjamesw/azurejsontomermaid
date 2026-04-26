@@ -173,6 +173,33 @@ function renderInventory() {
   });
 }
 
+function formatDetailValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "Not set";
+  }
+  if (Array.isArray(value)) {
+    return value.length ? value.join(", ") : "Not set";
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function renderDefinitionList(items) {
+  const rows = items
+    .filter((item) => item.value !== undefined && item.value !== null && item.value !== "")
+    .map((item) => `
+      <div class="detail-grid-row">
+        <dt>${escapeHtml(item.label)}</dt>
+        <dd>${escapeHtml(formatDetailValue(item.value))}</dd>
+      </div>
+    `)
+    .join("");
+
+  return rows ? `<dl class="detail-grid">${rows}</dl>` : '<div class="detail-meta">No additional metadata available.</div>';
+}
+
 function renderDetail() {
   const detail = $("#detail");
   const node = state.graph?.nodes?.find((item) => item.id === state.selectedId);
@@ -190,6 +217,22 @@ function renderDetail() {
   });
 
   const metadataKeys = Object.keys(node.metadata || {}).filter((key) => key !== "properties").slice(0, 10);
+  const tags = node.metadata?.tags && typeof node.metadata.tags === "object"
+    ? Object.entries(node.metadata.tags)
+    : [];
+  const importantFields = [
+    { label: "Location", value: node.metadata?.location },
+    { label: "Original kind", value: node.metadata?.kind },
+    { label: "SKU", value: node.metadata?.sku?.name || node.metadata?.sku },
+    { label: "SKU tier", value: node.metadata?.sku?.tier },
+    { label: "Managed by", value: node.metadata?.managedBy },
+    { label: "Zones", value: node.metadata?.zones },
+    { label: "Identity type", value: node.metadata?.identity?.type },
+    { label: "Plan", value: node.metadata?.plan?.name || node.metadata?.plan },
+    { label: "Extended location", value: node.metadata?.extendedLocation?.name || node.metadata?.extendedLocation?.type },
+    { label: "Provisioning state", value: node.metadata?.properties?.provisioningState },
+  ];
+  const rawMetadata = JSON.stringify(node.metadata || {}, null, 2);
 
   detail.innerHTML = `
     <h4>${escapeHtml(node.name)}</h4>
@@ -210,12 +253,33 @@ function renderDetail() {
       <div class="detail-meta">${escapeHtml(node.armId || "Synthetic node")}</div>
     </div>
     <div class="detail-block">
+      <strong>Resource details</strong>
+      ${renderDefinitionList(importantFields)}
+    </div>
+    <div class="detail-block">
+      <strong>Tags</strong>
+      ${tags.length
+        ? `<dl class="detail-grid">${tags.map(([key, value]) => `
+            <div class="detail-grid-row">
+              <dt>${escapeHtml(key)}</dt>
+              <dd>${escapeHtml(formatDetailValue(value))}</dd>
+            </div>
+          `).join("")}</dl>`
+        : '<div class="detail-meta">No tags on this resource.</div>'}
+    </div>
+    <div class="detail-block">
       <strong>Relationships</strong>
       ${connected.length ? `<ul class="detail-list">${connected.slice(0, 12).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : '<div class="detail-meta">No related nodes in the current graph.</div>'}
     </div>
     <div class="detail-block">
       <strong>Metadata keys</strong>
       ${metadataKeys.length ? `<ul class="detail-list">${metadataKeys.map((key) => `<li>${escapeHtml(key)}</li>`).join("")}</ul>` : '<div class="detail-meta">No top-level metadata keys available.</div>'}
+    </div>
+    <div class="detail-block">
+      <details class="detail-json">
+        <summary>Full resource JSON</summary>
+        <pre>${escapeHtml(rawMetadata)}</pre>
+      </details>
     </div>
   `;
 }
