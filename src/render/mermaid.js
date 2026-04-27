@@ -79,10 +79,53 @@ function addClassDefs(lines) {
   lines.push("classDef resource fill:#ffffff,stroke:#a6b0bd,color:#0f172a;");
 }
 
+function layoutConfig(options = {}) {
+  const outer = options.layout === "TB" ? "TB" : "LR";
+  return {
+    outer,
+    subscription: outer,
+    group: outer === "LR" ? "TB" : "LR",
+    lane: outer === "LR" ? "LR" : "TB",
+  };
+}
+
+function familyLane(serviceFamily) {
+  const lane = ["network", "compute", "platform", "resource"].includes(serviceFamily)
+    ? serviceFamily
+    : "resource";
+  const labelMap = {
+    network: "Network",
+    compute: "Compute",
+    platform: "Platform",
+    resource: "Supporting resources",
+  };
+  return {
+    key: lane,
+    label: labelMap[lane],
+  };
+}
+
+function groupNodesByLane(nodes) {
+  const lanes = new Map();
+  nodes.forEach((node) => {
+    const lane = familyLane(node.serviceFamily);
+    if (!lanes.has(lane.key)) {
+      lanes.set(lane.key, {
+        ...lane,
+        nodes: [],
+      });
+    }
+    lanes.get(lane.key).nodes.push(node);
+  });
+  return ["network", "compute", "platform", "resource"]
+    .map((key) => lanes.get(key))
+    .filter(Boolean);
+}
+
 export function renderMermaid(viewGraph, options = {}) {
-  const direction = options.layout === "TB" ? "TB" : "LR";
+  const layout = layoutConfig(options);
   const grouping = options.grouping || "resourceGroup";
-  const lines = [`flowchart ${direction}`];
+  const lines = [`flowchart ${layout.outer}`];
   addClassDefs(lines);
 
   const subscriptions = viewGraph.nodes.filter((node) => node.kind === "subscription");
@@ -105,20 +148,46 @@ export function renderMermaid(viewGraph, options = {}) {
   } else {
     subscriptions.forEach((subscription) => {
       lines.push(`subgraph ${nodeRef(subscription.id)}_sg["${escapeHtml(subscription.label || subscription.name)}"]`);
-      lines.push("direction TB");
+      lines.push(`direction ${layout.subscription}`);
 
       const subscriptionGroups = groups.filter((group) => group.subscriptionId === subscription.subscriptionId);
       if (grouping === "subscription") {
-        others
+        const subscriptionNodes = others
           .filter((node) => node.subscriptionId === subscription.subscriptionId)
-          .forEach((node) => emitNode(node, "  "));
+          .sort((left, right) => left.name.localeCompare(right.name));
+        const lanes = groupNodesByLane(subscriptionNodes);
+        const renderLanes = lanes.length > 1;
+
+        if (renderLanes) {
+          lanes.forEach((lane) => {
+            lines.push(`  subgraph ${nodeRef(subscription.id)}_${lane.key}_lane["${escapeHtml(lane.label)}"]`);
+            lines.push(`  direction ${layout.lane}`);
+            lane.nodes.forEach((node) => emitNode(node, "    "));
+            lines.push("  end");
+          });
+        } else {
+          subscriptionNodes.forEach((node) => emitNode(node, "  "));
+        }
       } else {
         subscriptionGroups.forEach((group) => {
           lines.push(`  subgraph ${nodeRef(group.id)}_sg["${escapeHtml(group.label || group.name)}"]`);
-          lines.push("  direction LR");
-          others
+          lines.push(`  direction ${layout.group}`);
+          const groupNodes = others
             .filter((node) => node.subscriptionId === group.subscriptionId && node.resourceGroup === group.resourceGroup)
-            .forEach((node) => emitNode(node, "    "));
+            .sort((left, right) => left.name.localeCompare(right.name));
+          const lanes = groupNodesByLane(groupNodes);
+          const renderLanes = lanes.length > 1;
+
+          if (renderLanes) {
+            lanes.forEach((lane) => {
+              lines.push(`    subgraph ${nodeRef(group.id)}_${lane.key}_lane["${escapeHtml(lane.label)}"]`);
+              lines.push(`    direction ${layout.lane}`);
+              lane.nodes.forEach((node) => emitNode(node, "      "));
+              lines.push("    end");
+            });
+          } else {
+            groupNodes.forEach((node) => emitNode(node, "    "));
+          }
           lines.push("  end");
         });
       }
