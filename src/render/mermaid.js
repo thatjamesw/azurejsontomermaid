@@ -1,5 +1,11 @@
 import { escapeHtml, sanitizeId } from "../core/arm.js";
 
+const DEFAULT_CHUNK_LIMITS = {
+  maxChars: 120000,
+  maxNodes: 180,
+  maxEdges: 220,
+};
+
 function classForKind(kind) {
   const map = {
     subscription: "subscription",
@@ -145,4 +151,104 @@ export function renderMermaid(viewGraph, options = {}) {
   });
 
   return lines.join("\n");
+}
+
+function makeChunkTitle(nodes) {
+  const first = nodes[0];
+  if (!first) {
+    return "Topology chunk";
+  }
+  const subscription = first.subscriptionId || "unknown-subscription";
+  const resourceGroup = first.resourceGroup || "unknown-resource-group";
+  return `${subscription} / ${resourceGroup}`;
+}
+
+function fitsChunk(document, limits) {
+  return document.mermaid.length <= limits.maxChars
+    && document.nodeCount <= limits.maxNodes
+    && document.edgeCount <= limits.maxEdges;
+}
+
+function buildChunkDocument(viewGraph, options, nodeIds, title) {
+  const nodes = viewGraph.nodes.filter((node) => nodeIds.has(node.id));
+  const edges = viewGraph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+  return {
+    title,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    mermaid: renderMermaid({ nodes, edges }, options),
+  };
+}
+
+function chunkNodes(viewGraph, options, nodes, limits, title, depth = 0) {
+  const scopedNodeIds = new Set(nodes.map((node) => node.id));
+
+  nodes.forEach((node) => {
+    viewGraph.nodes.forEach((candidate) => {
+      if (
+        (candidate.kind === "subscription" && candidate.subscriptionId === node.subscriptionId)
+        || (
+          candidate.kind === "resourceGroup"
+          && candidate.subscriptionId === node.subscriptionId
+          && candidate.resourceGroup === node.resourceGroup
+        )
+      ) {
+        scopedNodeIds.add(candidate.id);
+      }
+    });
+  });
+
+  const document = buildChunkDocument(viewGraph, options, scopedNodeIds, title);
+  if (fitsChunk(document, limits) || nodes.length <= 1 || depth >= 8) {
+    return [document];
+  }
+
+  const sorted = [...nodes].sort((left, right) => left.name.localeCompare(right.name));
+  const midpoint = Math.ceil(sorted.length / 2);
+  const leftTitle = `${title} (part 1)`;
+  const rightTitle = `${title} (part 2)`;
+
+  return [
+    ...chunkNodes(viewGraph, options, sorted.slice(0, midpoint), limits, leftTitle, depth + 1),
+    ...chunkNodes(viewGraph, options, sorted.slice(midpoint), limits, rightTitle, depth + 1),
+  ];
+}
+
+export function createMermaidDocuments(viewGraph, options = {}, limits = {}) {
+  const resolvedLimits = { ...DEFAULT_CHUNK_LIMITS, ...limits };
+  const primary = {
+    title: "Complete topology",
+    nodeCount: viewGraph.nodes.length,
+    edgeCount: viewGraph.edges.length,
+    mermaid: renderMermaid(viewGraph, options),
+  };
+
+  if (fitsChunk(primary, resolvedLimits)) {
+    return {
+      mode: "single",
+      documents: [primary],
+      primary,
+    };
+  }
+
+  const resourceNodes = viewGraph.nodes.filter((node) => node.kind !== "subscription" && node.kind !== "resourceGroup");
+  const groups = new Map();
+
+  resourceNodes.forEach((node) => {
+    const key = `${node.subscriptionId || "unknown-subscription"}::${node.resourceGroup || "unknown-resource-group"}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(node);
+  });
+
+  const documents = Array.from(groups.values())
+    .sort((left, right) => right.length - left.length || makeChunkTitle(left).localeCompare(makeChunkTitle(right)))
+    .flatMap((nodes) => chunkNodes(viewGraph, options, nodes, resolvedLimits, makeChunkTitle(nodes)));
+
+  return {
+    mode: "chunked",
+    documents,
+    primary,
+  };
 }

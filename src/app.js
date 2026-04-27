@@ -3,7 +3,7 @@ import "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.4/dist/mermaid-l
 import { buildGraph, projectView } from "./core/graph.js";
 import { normalizePayloads } from "./core/normalize.js";
 import { escapeHtml } from "./core/arm.js";
-import { renderMermaid } from "./render/mermaid.js";
+import { createMermaidDocuments } from "./render/mermaid.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -15,6 +15,8 @@ const state = {
   graph: null,
   viewGraph: null,
   mermaid: "",
+  diagramDocuments: [],
+  diagramMode: "single",
   selectedId: "",
   breakdown: {
     providers: [],
@@ -27,6 +29,7 @@ function initMermaid() {
     startOnLoad: false,
     securityLevel: "loose",
     theme: "default",
+    maxTextSize: 250000,
     flowchart: {
       defaultRenderer: "elk",
       htmlLabels: true,
@@ -61,6 +64,19 @@ function currentOptions() {
     includeInferred: $("#inferred-toggle").checked,
     includeContainment: $("#containment-toggle").checked,
   };
+}
+
+function mermaidBundleText(documents) {
+  if (!documents.length) {
+    return "";
+  }
+  if (documents.length === 1) {
+    return documents[0].mermaid;
+  }
+  return documents.map((document, index) => [
+    `%% Diagram ${index + 1}: ${document.title}`,
+    document.mermaid,
+  ].join("\n")).join("\n\n");
 }
 
 function summarizeCounts(items) {
@@ -286,12 +302,60 @@ function renderDetail() {
 
 async function renderDiagram() {
   const shell = $("#diagram");
+  shell.className = "";
   shell.textContent = "Rendering topology...";
+
   try {
-    const renderId = `mermaid-${Math.random().toString(36).slice(2)}`;
-    const { svg } = await mermaid.render(renderId, state.mermaid);
-    shell.innerHTML = svg;
+    if (state.diagramDocuments.length <= 1) {
+      const diagramDocument = state.diagramDocuments[0];
+      if (!diagramDocument) {
+        shell.className = "diagram-empty";
+        shell.textContent = "Build a topology view to render the diagram.";
+        return;
+      }
+      const renderId = `mermaid-${Math.random().toString(36).slice(2)}`;
+      const { svg } = await mermaid.render(renderId, diagramDocument.mermaid);
+      shell.innerHTML = svg;
+      return;
+    }
+
+    shell.innerHTML = "";
+    shell.className = "diagram-collection";
+
+    for (const [index, diagramDocument] of state.diagramDocuments.entries()) {
+      const card = document.createElement("section");
+      card.className = "diagram-card";
+
+      const heading = document.createElement("div");
+      heading.className = "diagram-card-head";
+      heading.innerHTML = `
+        <strong>${escapeHtml(diagramDocument.title)}</strong>
+        <span>${diagramDocument.nodeCount} nodes • ${diagramDocument.edgeCount} edges • diagram ${index + 1} of ${state.diagramDocuments.length}</span>
+      `;
+
+      const frame = document.createElement("div");
+      frame.className = "diagram-card-shell";
+
+      const renderId = `mermaid-${Math.random().toString(36).slice(2)}`;
+      const { svg } = await mermaid.render(renderId, diagramDocument.mermaid);
+      frame.innerHTML = svg;
+      card.append(heading, frame);
+      shell.appendChild(card);
+    }
   } catch (error) {
+    if (state.diagramDocuments.length === 1 && state.viewGraph) {
+      const fallbackOutput = createMermaidDocuments(state.viewGraph, currentOptions(), { maxChars: 60000 });
+      if (fallbackOutput.mode === "chunked") {
+        state.diagramMode = fallbackOutput.mode;
+        state.diagramDocuments = fallbackOutput.documents;
+        state.mermaid = mermaidBundleText(state.diagramDocuments);
+        $("#mermaid-output").value = state.mermaid;
+        updateStatus(`The complete Mermaid diagram exceeded the renderer limit, so the view was split into ${state.diagramDocuments.length} smaller diagrams.`, "warning");
+        await renderDiagram();
+        return;
+      }
+    }
+    shell.className = "diagram-empty";
     shell.textContent = `Mermaid render failed: ${error.message}`;
   }
 }
@@ -306,6 +370,8 @@ async function rebuild() {
     state.graph = null;
     state.viewGraph = null;
     state.mermaid = "";
+    state.diagramDocuments = [];
+    state.diagramMode = "single";
     state.selectedId = "";
     state.breakdown = { providers: [], types: [] };
     $("#diagram").textContent = "Build a topology view to render the diagram.";
@@ -322,6 +388,8 @@ async function rebuild() {
     state.graph = null;
     state.viewGraph = null;
     state.mermaid = "";
+    state.diagramDocuments = [];
+    state.diagramMode = "single";
     state.breakdown = { providers: [], types: [] };
     $("#diagram").textContent = "No resources were found in the supplied JSON.";
     $("#mermaid-output").value = "";
@@ -335,7 +403,10 @@ async function rebuild() {
 
   state.graph = buildGraph(state.resources, currentOptions());
   state.viewGraph = projectView(state.graph, currentOptions().view);
-  state.mermaid = renderMermaid(state.viewGraph, currentOptions());
+  const mermaidOutput = createMermaidDocuments(state.viewGraph, currentOptions());
+  state.diagramMode = mermaidOutput.mode;
+  state.diagramDocuments = mermaidOutput.documents;
+  state.mermaid = mermaidBundleText(state.diagramDocuments);
   state.breakdown = {
     providers: summarizeCounts(state.resources.map((item) => String(item.type || "").toLowerCase().split("/")[0] || "unknown")),
     types: summarizeCounts(state.resources.map((item) => String(item.type || "").toLowerCase())),
@@ -346,7 +417,10 @@ async function rebuild() {
     : state.graph.nodes.find((node) => !node.synthetic)?.id || "";
 
   updateSummaries();
-  updateStatus(`Built ${state.viewGraph.nodes.length} nodes and ${state.viewGraph.edges.length} edges for the ${currentOptions().view} view.`);
+  const bundleNote = state.diagramMode === "chunked"
+    ? ` Large view auto-split into ${state.diagramDocuments.length} Mermaid diagrams.`
+    : "";
+  updateStatus(`Built ${state.viewGraph.nodes.length} nodes and ${state.viewGraph.edges.length} edges for the ${currentOptions().view} view.${bundleNote}`);
   renderInventory();
   renderDetail();
   renderCoverage();
@@ -370,14 +444,18 @@ function downloadText(filename, content, mimeType) {
 }
 
 function downloadSvg() {
-  const svg = document.querySelector("#diagram svg");
-  if (!svg) {
+  const svgs = Array.from(document.querySelectorAll("#diagram svg"));
+  if (!svgs.length) {
     updateStatus("Build a topology first so there is an SVG to export.", "warning");
     return;
   }
-  const clone = svg.cloneNode(true);
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  downloadText("azure-topology.svg", new XMLSerializer().serializeToString(clone), "image/svg+xml;charset=utf-8");
+
+  svgs.forEach((svg, index) => {
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const suffix = svgs.length === 1 ? "" : `-${String(index + 1).padStart(2, "0")}`;
+    downloadText(`azure-topology${suffix}.svg`, new XMLSerializer().serializeToString(clone), "image/svg+xml;charset=utf-8");
+  });
 }
 
 async function copyMermaid() {
@@ -407,6 +485,8 @@ function clearSession() {
   state.graph = null;
   state.viewGraph = null;
   state.mermaid = "";
+  state.diagramDocuments = [];
+  state.diagramMode = "single";
   state.selectedId = "";
   state.breakdown = { providers: [], types: [] };
   $("#diagram").textContent = "Build a topology view to render the diagram.";
