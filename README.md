@@ -1,6 +1,6 @@
 # Azure JSON to Mermaid
 
-Azure JSON to Mermaid is a browser-based topology designer for Azure environments. It takes Azure resource exports, models them as a connected graph, and turns them into Mermaid diagrams that can be reviewed, refined, and shared.
+Azure JSON to Mermaid is a browser-based tool for turning Azure resource exports into Mermaid topology diagrams. It takes Azure JSON payloads, models them as a connected graph, and creates diagrams that can be reviewed, refined, and shared.
 
 The application is built as a static site and is well suited to GitHub Pages. There is no backend dependency, and all parsing and graph generation happen in the browser.
 
