@@ -68,11 +68,12 @@ body{
 
 .masthead h1{
   margin:0 0 14px;
-  max-width:12ch;
-  font-size:6rem;
+  max-width:none;
+  font-size:6.8rem;
   line-height:.92;
   font-weight:700;
   letter-spacing:0;
+  white-space:nowrap;
 }
 
 .masthead-lede{
@@ -786,7 +787,7 @@ button:active{transform:translateY(0)}
 
 @media (max-width: 1180px){
   .masthead h1{
-    font-size:4.9rem;
+    font-size:5.4rem;
   }
 
   .workflow-strip,
@@ -817,8 +818,8 @@ button:active{transform:translateY(0)}
   }
 
   .masthead h1{
-    max-width:10ch;
-    font-size:3.6rem;
+    font-size:3.9rem;
+    white-space:normal;
   }
 
   .step-marker h2{
